@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from .models import UserCreate, UserLogin, Token
 import uuid
 import hashlib
+import httpx
+import time 
+
+ANALYTICS_URL = "http://127.0.0.1:8001/events"
 
 app = FastAPI(
     title="Auth Service",
@@ -37,7 +41,22 @@ def login(user: UserLogin):
     hashed = fake_users_db.get(user.email)
     if not hashed or hashed != hash_password(user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    
     token = str(uuid.uuid4())
+
+    # Send event to analytics service
+    event = {
+        "user_id": user.email,  # using email as ID for now
+        "action": "login",
+        "timestamp": time.time()
+    }
+
+    try:
+        response = httpx.post(ANALYTICS_URL, json=event, timeout=3.0)
+        print("Analytics Event Response:", response.json())
+    except Exception as e:
+        print("Failed to send event to analytics:", e)
+
     return Token(access_token=token)
 
 @app.get("/health")
